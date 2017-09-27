@@ -1,0 +1,78 @@
+# Based on http://symfony.com/doc/current/setup/web_server_configuration.html#web-server-nginx.
+
+server {
+    listen 80 default_server;
+    listen [::]:80 default_server ipv6only=on;
+
+    gzip on;
+    gzip_disable "msie6";
+    gzip_vary on;
+    gzip_types
+      text/plain
+      application/json
+      application/javascript
+      application/vnd.ms-fontobject
+      application/x-font-ttf
+      application/x-javascript
+      application/x-web-app-manifest+json
+      application/xhtml+xml
+      application/xml
+      image/svg+xml
+      image/x-icon
+      text/css
+      text/xml
+      text/plain
+      text/javascript;
+
+    client_max_body_size 9m;
+
+    root /usr/share/nginx/html/web;
+    index index.php index.html index.htm;
+
+    # Make site accessible from http://localhost/
+    server_name localhost;
+
+    location / {
+        # try to serve file directly, fallback to app.php
+        try_files $uri /app.php$is_args$args;
+    }
+
+    # PROD
+    location ~ ^/app\.php(/|$) {
+        fastcgi_pass 127.0.0.1:9000;
+        fastcgi_split_path_info ^(.+?\.php)(|/.*)$;
+        include fastcgi_params;
+        # Block httpoxy attacks. See https://httpoxy.org/.
+        fastcgi_param HTTP_PROXY "";
+        # When you are using symlinks to link the document root to the
+        # current version of your application, you should pass the real
+        # application path instead of the path to the symlink to PHP
+        # FPM.
+        # Otherwise, PHP's OPcache may not properly detect changes to
+        # your PHP files (see https://github.com/zendtech/ZendOptimizerPlus/issues/126
+        # for more information).
+        fastcgi_param SCRIPT_FILENAME $realpath_root$fastcgi_script_name;
+        fastcgi_param DOCUMENT_ROOT $realpath_root;
+        # Prevents URIs that include the front controller. This will 404:
+        # http://domain.tld/app.php/some-path
+        # Remove the internal directive to allow URIs like this
+        internal;
+     }
+
+    # return 404 for all other php files not matching the front controller
+    # this prevents access to other php files you don't want to be accessible.
+    location ~ \.php$ {
+        return 404;
+    }
+
+    # This block will catch static file requests, such as images, css, js
+    # The ?: prefix is a 'non-capturing' mark, meaning we do not require
+    # the pattern to be captured into $1 which should help improve performance
+    location ~* \.(?:ico|css|js|gif|jpe?g|png|woff|ttf|otf|svg|woff2|eot)$ {
+      # Some basic cache-control for static files to be sent to the browser
+      expires 7d;
+      add_header Pragma public;
+      add_header Cache-Control "public, must-revalidate, proxy-revalidate";
+    }
+
+}
